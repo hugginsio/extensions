@@ -1,0 +1,40 @@
+name: zeropod
+variant: scratch
+shell: "/bin/bash"
+dependencies:
+  - stage: base
+steps:
+  - sources:
+      - url: "https://github.com/ctrox/zeropod/archive/{{ .ZEROPOD_REV }}.tar.gz"
+        destination: zeropod.tar.gz
+        sha256: "{{ .ZEROPOD_SHA256 }}"
+        sha512: "{{ .ZEROPOD_SHA512 }}"
+    env:
+      GOPATH: "/tmp/go"
+    cachePaths:
+      - "/.cache/go-build"
+      - "/tmp/go/pkg"
+  - network: default
+    prepare:
+      - |-
+        mkdir -p ${GOPATH}/src/github.com/ctrox/zeropod
+
+        tar -xzf zeropod.tar.gz --strip-components=1 -C ${GOPATH}/src/github.com/ctrox/zeropod
+      - |-
+        cd ${GOPATH}/src/github.com/ctrox/zeropod
+        go mod download
+  - network: none
+    build:
+      - |-
+        cd ${GOPATH}/src/github.com/ctrox/zeropod
+
+        mkdir ./bin
+
+        CGO_ENABLED=0 go build -ldflags "-s -w" -a -o ./bin/freezer ./cmd/freezer/main.go
+        CGO_ENABLED=0 go build -ldflags "-s -w" -a -o ./bin/zeropod-installer ./cmd/zeropod-installer/main.go
+        CGO_ENABLED=0 go build -ldflags "-s -w" -a -o ./bin/zeropod-manager ./cmd/zeropod-manager/main.go
+finalize:
+  - from: "/rootfs"
+    to: "/rootfs"
+  - from: "/pkg/manifest.yaml"
+    to: "/"
